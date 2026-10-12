@@ -110,11 +110,32 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--signal);outline
 .cat.star small{color:var(--star)}
 .lvl{font-family:var(--display);font-weight:700;font-size:15px;color:var(--muted);letter-spacing:.06em;margin:14px 20px 2px}
 .cat.sub{padding-left:36px;font-size:16px}
+.grp{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;padding:14px 20px;font-family:var(--display);font-weight:700;font-size:18px;border-top:1px solid var(--line)}
+.grp .r{display:flex;align-items:center;gap:10px;color:var(--muted);font-family:inherit;font-weight:400;font-size:14px}
+.grp svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
+.grp.open svg{transform:rotate(180deg)}
+.grp.has{color:var(--signal)}
+.gbody{display:none;padding-bottom:6px}
+.gbody.open{display:block}
 .feedback .hint{display:block;color:var(--muted);font-size:14px;margin-top:4px}
 .sep{height:1px;background:var(--line);margin:10px 20px}
 .drawer .tools{margin-top:auto;padding:12px 20px 0;color:var(--muted);font-size:14px}
 .link{color:var(--signal);font-weight:600;padding:8px 0;font-size:15px}
 
+.recover{overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:24px}
+.rhead{display:flex;justify-content:space-between;align-items:center}
+.rtitle{font-family:var(--display);font-size:30px;letter-spacing:-.01em;margin:6px 0 4px}
+.rsub{color:var(--muted);font-size:15px;margin:0 0 10px}
+.rsec{font-family:var(--display);font-weight:700;font-size:15px;color:var(--muted);letter-spacing:.06em;margin:20px 0 4px}
+.rlist details{border-top:1px solid var(--line)}
+.rlist summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:13px 0;font-weight:600;cursor:pointer}
+.rlist summary::-webkit-details-marker{display:none}
+.rlist summary small{color:var(--muted);font-weight:500}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0 8px 12px;border-top:1px dashed var(--line)}
+.rrow span{font-size:15px;overflow-wrap:anywhere}
+.rrow span em{font-style:normal;color:var(--muted)}
+.rbtn{color:var(--signal);font-weight:600;font-size:14px;padding:6px 0;white-space:nowrap}
+.rall{display:block;margin:0 0 8px 12px}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 80px);transform:translate(-50%,20px);background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:12px;display:flex;gap:16px;align-items:center;font-size:15px;opacity:0;pointer-events:none;transition:all .2s;z-index:9;max-width:calc(100% - 36px);width:max-content;justify-content:space-between}
 .toast.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 .toast button{color:var(--signal);font-weight:600;filter:brightness(1.4)}
@@ -157,6 +178,13 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--signal);outline
     </div>
     <div class="foot"><button class="mic" id="micBtn"><span class="dot"></span><span id="micTxt">Rispondi a voce</span></button></div>
   </section>
+
+  <section class="screen recover" id="recover">
+    <div class="rhead"><button class="link" id="recBack">← Indietro</button><button class="link" id="recAll">Recupera tutto</button></div>
+    <h2 class="rtitle">Recupera parole</h2>
+    <p class="rsub" id="recSub"></p>
+    <div class="rlist" id="recList"></div>
+  </section>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -165,7 +193,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--signal);outline
   <div id="cats"></div>
   <div class="tools">
     <div id="delInfo"></div>
-    <button class="link" id="restoreBtn">Ripristina parole cancellate</button>
+    <button class="link" id="restoreBtn">Recupera parole cancellate</button>
   </div>
 </nav>
 <div class="toast" id="toast"><span id="toastTxt"></span><button id="toastBtn">Annulla</button></div>
@@ -255,6 +283,7 @@ function buildDeck(){ deck=shuffle(pool(state.cat)); pos=0; right=0; done=0; }
 const $=id=>document.getElementById(id);
 const inDrill=()=>$("drill").classList.contains("on");
 function dirLabel(){ return state.dir==="it-en" ? 'IT <span class="arrow">→</span> EN' : 'EN <span class="arrow">→</span> IT'; }
+const openGroups=new Set();
 function renderChrome(){
   $("dirBtn").innerHTML = dirLabel();
   $("barCat").textContent = inDrill() ? catName(state.cat) : "";
@@ -262,18 +291,25 @@ function renderChrome(){
   $("homeNow").textContent = catName(state.cat)+" · "+n+(n===1?" parola":" parole");
   const btn=(k,label,cls="")=>`<button class="cat${k===state.cat?' sel':''}${cls}" data-k="${k}"><span>${label}</span><small>${pool(k).length}</small></button>`;
   let h=btn("ALL","Tutte");
+  const chev='<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const grp=(g,label,inner)=>{
+    const on=openGroups.has(g), has=state.cat.split(":")[0]===g;
+    return `<button class="grp${on?' open':''}${has?' has':''}" data-g="${g}"><span>${label}</span><span class="r">${pool(g).length}${chev}</span></button><div class="gbody${on?' open':''}">${inner}</div>`;
+  };
   for(const l of LEVELS){
-    h+=`<div class="lvl">${l}</div>`+btn(l,"Tutto "+l);
-    for(const [s,name] of SUBS) h+=btn(l+":"+s,name," sub");
+    let inner=btn(l,"Tutto "+l," sub");
+    for(const [s,name] of SUBS) inner+=btn(l+":"+s,name," sub");
+    h+=grp(l,l,inner);
   }
   for(const [d,name] of DOMS){
-    h+=`<div class="lvl">${name}</div>`+btn(d,"Tutto "+name);
-    for(const l of LEVELS) h+=btn(d+":"+l,l," sub");
+    let inner=btn(d,"Tutto "+name," sub");
+    for(const l of LEVELS) inner+=btn(d+":"+l,l," sub");
+    h+=grp(d,name,inner);
   }
   h+='<div class="sep"></div>'+btn("STAR","★ Ricorda"," star");
   $("cats").innerHTML=h;
   $("delInfo").textContent = deleted.size ? deleted.size+" parole cancellate" : "Nessuna parola cancellata";
-  $("restoreBtn").style.display = deleted.size ? "" : "none";
+
 }
 function show(id){
   for(const s of document.querySelectorAll(".screen")) s.classList.toggle("on", s.id===id);
@@ -340,7 +376,7 @@ function check(spoken){
   checked=true;
   if(res==="ok"){ a.className="answer ok"; fb.className="feedback ok"; fb.innerHTML='<span class="verdict">Giusto</span>'+(main.length>1?'<span class="sol">'+esc(solTxt)+'</span>':''); }
   else if(res==="near"){ a.className="answer ok"; fb.className="feedback ok"; fb.innerHTML='<span class="verdict">Giusto, occhio all\'ortografia</span><span class="sol">'+esc(solTxt)+'</span>'; }
-  else { a.className="answer ko"; fb.className="feedback ko"; fb.innerHTML='<span class="verdict">'+(res==="skip"?"Da ripassare":"Sbagliato")+'</span><span class="sol">Corretto: '+esc(solTxt)+'</span>'+(voiceOn?'<span class="hint">Di\' «ok» per andare avanti</span>':''); }
+  else { a.className="answer ko"; fb.className="feedback ko"; fb.innerHTML='<span class="verdict">'+(res==="skip"?"Da ripassare":"Sbagliato")+'</span><span class="sol">Corretto: '+esc(solTxt)+'</span>'+(voiceOn?'<span class="hint">Di\' «ok» per andare avanti o «cancella» per toglierla</span>':''); }
   $("score").textContent = right+" corrette su "+done;
   return res;
 }
@@ -380,15 +416,57 @@ function openMenu(o){ $("drawer").classList.toggle("on",o); $("scrim").classList
 $("menuBtn").onclick=()=>openMenu(true);
 $("scrim").onclick=()=>openMenu(false);
 $("cats").onclick=e=>{
+  const g=e.target.closest(".grp");
+  if(g){ const k=g.dataset.g; openGroups.has(k)?openGroups.delete(k):openGroups.add(k); renderChrome(); return; }
   const b=e.target.closest(".cat"); if(!b) return;
   state.cat=b.dataset.k; save(); openMenu(false); renderChrome();
   if(inDrill()){ buildDeck(); renderWord(); }
 };
+/* ---------- recupera parole ---------- */
+let prevScreen="home", recChanged=false, recOpen=new Set();
+const GROUPS=[];
+for(const l of LEVELS) for(const [s,n] of SUBS) GROUPS.push([l+":"+s, l, SUB_NAME[s]]);
+for(const [d,n] of DOMS) for(const l of LEVELS) GROUPS.push([d+":"+l, n, l]);
+const groupOf=w=> w.lvl ? w.lvl+":"+w.sub : w.dom+":"+w.dlvl;
 $("restoreBtn").onclick=()=>{
-  const n=deleted.size; const prev=new Set(deleted);
-  deleted.clear(); save(); renderChrome();
-  if(inDrill()){ buildDeck(); renderWord(); }
-  toast(n+" parole ripristinate", ()=>{ deleted=prev; save(); renderChrome(); if(inDrill()){ buildDeck(); renderWord(); } });
+  openMenu(false);
+  prevScreen = inDrill() ? "drill" : "home"; recChanged=false; recOpen=new Set();
+  if(voiceOn) $("micBtn").onclick();
+  renderRecover(); show("recover"); $("recover").scrollTop=0;
+};
+function renderRecover(){
+  const del=items.map((w,i)=>[w,i]).filter(([w])=>deleted.has(w.key));
+  $("recAll").style.display = del.length ? "" : "none";
+  $("recSub").textContent = del.length ? del.length+" parole cancellate. Recuperale una per una o per gruppo." : "";
+  if(!del.length){ $("recList").innerHTML='<div class="empty" style="margin-top:40px"><b>Nessuna parola cancellata</b>Quelle che cancelli finiscono qui e puoi recuperarle quando vuoi.</div>'; return; }
+  const by={}; for(const x of del){ (by[groupOf(x[0])] ||= []).push(x); }
+  let h="", lastSec="";
+  for(const [g,sec,name] of GROUPS){
+    const arr=by[g]; if(!arr) continue;
+    if(sec!==lastSec){ h+=`<div class="rsec">${sec}</div>`; lastSec=sec; }
+    arr.sort((a,b)=>a[0].it[0].localeCompare(b[0].it[0],"it"));
+    h+=`<details data-g="${g}"${recOpen.has(g)?" open":""}><summary><span>${name}</span><small>${arr.length} ▾</small></summary>`+
+       `<button class="rbtn rall" data-g="${g}">Recupera tutte (${arr.length})</button>`+
+       arr.map(([w,i])=>`<div class="rrow"><span>${esc(w.it[0])} <em>· ${esc(w.en[0])}</em></span><button class="rbtn" data-i="${i}">Recupera</button></div>`).join("")+
+       `</details>`;
+  }
+  $("recList").innerHTML=h;
+}
+$("recList").addEventListener("toggle",e=>{ const d=e.target; if(d.tagName==="DETAILS"){ d.open?recOpen.add(d.dataset.g):recOpen.delete(d.dataset.g); } },true);
+$("recList").onclick=e=>{
+  const b=e.target.closest(".rbtn"); if(!b) return;
+  if(b.dataset.i!==undefined){ deleted.delete(items[+b.dataset.i].key); toast("Parola recuperata"); }
+  else { let n=0; for(const w of items) if(deleted.has(w.key) && groupOf(w)===b.dataset.g){ deleted.delete(w.key); n++; } toast(n+" parole recuperate"); }
+  recChanged=true; save(); renderRecover(); renderChrome();
+};
+$("recAll").onclick=()=>{
+  const n=deleted.size, prev=new Set(deleted);
+  deleted.clear(); recChanged=true; save(); renderRecover(); renderChrome();
+  toast(n+" parole recuperate", ()=>{ deleted=prev; save(); renderRecover(); renderChrome(); });
+};
+$("recBack").onclick=()=>{
+  show(prevScreen);
+  if(prevScreen==="drill" && recChanged){ buildDeck(); renderWord(); }
 };
 
 let toastT;
@@ -408,6 +486,8 @@ let rec=null, voiceOn=false, wake=null, autoT=null, settleT=null, heard="", rest
 const OK_WORDS = ["ok","okay","o k","avanti","next","vai"];
 function micLabel(){ return state.dir==="it-en" ? "In ascolto · rispondi in inglese" : "In ascolto · rispondi in italiano"; }
 function setMic(cls, txt){ const m=$("micBtn"); m.className="mic"+(cls?" "+cls:""); $("micTxt").textContent=txt; }
+function isDel(v){ return /^(cancel|delete|remove|elimina|togli)/.test(v) && v.split(" ").length<=3; }
+function voiceDelete(){ clearTimeout(settleT); clearTimeout(autoT); $("delBtn").onclick(); }
 function isOk(v){ return OK_WORDS.some(w=>v===w || v.split(" ").includes(w) && v.split(" ").length<=2); }
 function onHeard(text, final){
   if(!inDrill()||!current) return;
@@ -415,11 +495,13 @@ function onHeard(text, final){
   if(phase==="ask"){
     $("answer").value=text.trim();
     const r=judge(v,true);
+    if(r!=="ok" && isDel(v)) return voiceDelete();
     // a right answer counts immediately; otherwise wait for the phrase to settle
     if(r==="ok"){ return resolveSpoken(); }
     clearTimeout(settleT);
     settleT=setTimeout(resolveSpoken, final?150:900);
   } else if(phase==="wrong" || phase==="done"){
+    if(isDel(v)) return voiceDelete();
     if(isOk(v)){ clearTimeout(autoT); next(); }
   }
 }
@@ -428,6 +510,7 @@ function resolveSpoken(){
   if(phase!=="ask") return;
   const v=norm($("answer").value);
   if(isOk(v) && judge(v,true)!=="ok"){ next(); return; }
+  if(isDel(v) && judge(v,true)!=="ok"){ voiceDelete(); return; }
   const r=check(true);
   if(r==="ok"||r==="near"){ phase="done"; autoT=setTimeout(()=>{ if(phase==="done") next(); },1500); }
   else { phase="wrong"; }
