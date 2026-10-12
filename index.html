@@ -531,6 +531,7 @@ function startRec(){
     onHeard(t, fin);
   };
   rec.onerror=e=>{
+    if(e.error==="audio-capture" && micStream){ dropStream(); return; }
     if(e.error==="not-allowed"||e.error==="service-not-allowed"){ voiceOn=false; rec=null; setMic("err","Microfono bloccato: apri in Safari"); keepAwake(false); }
   };
   rec.onend=()=>{ rec=null; restartPending=false; if(voiceOn) setTimeout(()=>{ if(voiceOn && !rec) try{ startRec(); }catch(_){} },120); };
@@ -543,11 +544,20 @@ async function keepAwake(on){
   }catch(_){}
 }
 document.addEventListener("visibilitychange",()=>{ if(voiceOn && document.visibilityState==="visible") keepAwake(true); });
-$("micBtn").onclick=()=>{
+/* apre il microfono "vero" prima dell'ascolto: aiuta l'iPhone a passare al microfono delle cuffie Bluetooth */
+let micStream=null;
+async function grabStream(){
+  try{
+    if(!micStream && navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+      micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+  }catch(_){ micStream=null; }
+}
+function dropStream(){ if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; } }
+$("micBtn").onclick=async()=>{
   if(!SR){ setMic("err","Voce non disponibile qui: apri in Safari"); return; }
   voiceOn=!voiceOn;
-  if(voiceOn){ setMic("live", micLabel()); keepAwake(true); if(inDrill()) renderWord(); else startRec(); }
-  else { clearTimeout(autoT); clearTimeout(settleT); try{ rec&&rec.abort(); }catch(_){} rec=null; setMic("","Rispondi a voce"); keepAwake(false); if(inDrill()) renderWord(); }
+  if(voiceOn){ setMic("live", micLabel()); keepAwake(true); await grabStream(); if(!voiceOn) return; if(inDrill()) renderWord(); else startRec(); }
+  else { clearTimeout(autoT); clearTimeout(settleT); try{ rec&&rec.abort(); }catch(_){} rec=null; dropStream(); setMic("","Rispondi a voce"); keepAwake(false); if(inDrill()) renderWord(); }
 };
 
 renderChrome();
