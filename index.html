@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#EEF1EC">
+<meta name="apple-mobile-web-app-title" content="Lessico">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Lessico</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -121,6 +125,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--signal);outline
 .sep{height:1px;background:var(--line);margin:10px 20px}
 .drawer .tools{margin-top:auto;padding:12px 20px 0;color:var(--muted);font-size:14px}
 .link{color:var(--signal);font-weight:600;padding:8px 0;font-size:15px}
+.datarow{display:flex;align-items:center;gap:18px;margin:10px 0 4px;padding-top:10px;border-top:1px solid var(--line)}
+.datarow>span{font-weight:600;color:var(--ink);font-size:14px;margin-right:auto}
 
 .recover{overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:24px}
 .rhead{display:flex;justify-content:space-between;align-items:center}
@@ -171,7 +177,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--signal);outline
         <button class="btn primary" id="nextBtn">Avanti</button>
       </div>
       <div class="sub">
-        <button class="btn quiet" id="starBtn"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg><span>Ricorda</span></button>
+        <button class="btn quiet" id="starBtn"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg><span>Salva</span></button>
         <button class="btn quiet" id="delBtn"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg>Cancella</button>
       </div>
       </div>
@@ -194,6 +200,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--signal);outline
   <div class="tools">
     <div id="delInfo"></div>
     <button class="link" id="restoreBtn">Recupera parole cancellate</button>
+    <div class="datarow"><span>Dati</span><button class="link" id="expBtn">Esporta</button><button class="link" id="impBtn">Importa</button></div>
+    <input type="file" id="impFile" accept=".json,application/json" hidden>
   </div>
 </nav>
 <div class="toast" id="toast"><span id="toastTxt"></span><button id="toastBtn">Annulla</button></div>
@@ -207,7 +215,7 @@ SUB_NAME.X = "Extra";
 const DOMS=[["BUS","Business"],["AUT","Automotive"]];
 const DOM_NAME=Object.fromEntries(DOMS);
 function catName(c){
-  if(c==="ALL") return "Tutte"; if(c==="STAR") return "Ricorda";
+  if(c==="ALL") return "Tutte"; if(c==="STAR") return "Salvate";
   const [a,b]=c.split(":");
   if(DOM_NAME[a]) return b ? DOM_NAME[a]+" · "+b : "Tutto "+DOM_NAME[a];
   return b ? a+" · "+SUB_NAME[b] : "Tutto "+a;
@@ -306,7 +314,7 @@ function renderChrome(){
     for(const l of LEVELS) inner+=btn(d+":"+l,l," sub");
     h+=grp(d,name,inner);
   }
-  h+='<div class="sep"></div>'+btn("STAR","★ Ricorda"," star");
+  h+='<div class="sep"></div>'+btn("STAR","★ Salvate"," star");
   $("cats").innerHTML=h;
   $("delInfo").textContent = deleted.size ? deleted.size+" parole cancellate" : "Nessuna parola cancellata";
 
@@ -323,7 +331,7 @@ function renderWord(){
     current=null; phase="idle";
     $("card").hidden=true; $("empty").hidden=false;
     $("empty").innerHTML = state.cat==="STAR"
-      ? '<div class="empty"><b>Ricorda è vuota</b>Durante l\'allenamento tocca la stella sotto una parola per aggiungerla qui.</div>'
+      ? '<div class="empty"><b>Nessuna parola salvata</b>Durante l\'allenamento tocca «Salva» (o di\' «salva») per aggiungere qui le parole da ripassare.</div>'
       : '<div class="empty"><b>Nessuna parola qui</b>Ripristina le parole cancellate dal menu o scegli un\'altra categoria.</div>';
     $("cnt").textContent=""; $("score").textContent=""; $("prog").style.width="0";
     return;
@@ -339,7 +347,7 @@ function renderWord(){
   a.placeholder = voiceOn ? (state.dir==="it-en" ? "Dilla in inglese…" : "Dilla in italiano…") : (state.dir==="it-en" ? "In inglese…" : "In italiano…");
   $("fb").className="feedback"; $("fb").innerHTML="";
   const s=starred.has(current.key); $("starBtn").classList.toggle("starred",s);
-  $("starBtn").querySelector("span").textContent = s ? "In Ricorda" : "Ricorda";
+  $("starBtn").querySelector("span").textContent = s ? "Salvata" : "Salva";
   $("cnt").textContent=(pos+1)+" / "+deck.length;
   $("score").textContent = done ? right+" corrette su "+done : "";
   $("prog").style.width=((pos)/deck.length*100)+"%";
@@ -376,7 +384,7 @@ function check(spoken){
   checked=true;
   if(res==="ok"){ a.className="answer ok"; fb.className="feedback ok"; fb.innerHTML='<span class="verdict">Giusto</span>'+(main.length>1?'<span class="sol">'+esc(solTxt)+'</span>':''); }
   else if(res==="near"){ a.className="answer ok"; fb.className="feedback ok"; fb.innerHTML='<span class="verdict">Giusto, occhio all\'ortografia</span><span class="sol">'+esc(solTxt)+'</span>'; }
-  else { a.className="answer ko"; fb.className="feedback ko"; fb.innerHTML='<span class="verdict">'+(res==="skip"?"Da ripassare":"Sbagliato")+'</span><span class="sol">Corretto: '+esc(solTxt)+'</span>'+(voiceOn?'<span class="hint">Di\' «ok» per andare avanti o «cancella» per toglierla</span>':''); }
+  else { a.className="answer ko"; fb.className="feedback ko"; fb.innerHTML='<span class="verdict">'+(res==="skip"?"Da ripassare":"Sbagliato")+'</span><span class="sol">Corretto: '+esc(solTxt)+'</span>'+(voiceOn?'<span class="hint">Di\' «ok» per andare avanti, «salva» per ripassarla, «cancella» per toglierla</span>':''); }
   $("score").textContent = right+" corrette su "+done;
   return res;
 }
@@ -394,10 +402,10 @@ $("nextBtn").onclick=next;
 $("answer").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); checked ? next() : $("checkBtn").onclick(); } });
 $("starBtn").onclick=()=>{
   if(!current) return;
-  if(starred.has(current.key)){ starred.delete(current.key); toast("Tolta da Ricorda"); }
-  else { starred.add(current.key); toast("Aggiunta a Ricorda"); }
+  if(starred.has(current.key)){ starred.delete(current.key); toast("Tolta dalle salvate"); }
+  else { starred.add(current.key); toast("Parola salvata"); }
   save(); const s=starred.has(current.key);
-  $("starBtn").classList.toggle("starred",s); $("starBtn").querySelector("span").textContent=s?"In Ricorda":"Ricorda";
+  $("starBtn").classList.toggle("starred",s); $("starBtn").querySelector("span").textContent=s?"Salvata":"Salva";
   renderChrome();
 };
 $("delBtn").onclick=()=>{
@@ -486,8 +494,18 @@ let rec=null, voiceOn=false, wake=null, autoT=null, settleT=null, heard="", rest
 const OK_WORDS = ["ok","okay","o k","avanti","next","vai"];
 function micLabel(){ return state.dir==="it-en" ? "In ascolto · rispondi in inglese" : "In ascolto · rispondi in italiano"; }
 function setMic(cls, txt){ const m=$("micBtn"); m.className="mic"+(cls?" "+cls:""); $("micTxt").textContent=txt; }
-function isDel(v){ return /^(cancel|delete|remove|elimina|togli)/.test(v) && v.split(" ").length<=3; }
+/* comandi vocali: il riconoscimento ascolta in una sola lingua, quindi accettiamo la parola sia in italiano sia in inglese
+   (e qualche variante che il motore sente al posto di «cancella» / «salva») */
+function cmdWords(v){ return v.split(" ").length<=3; }
+function isDel(v){ return cmdWords(v) && /^(cancel|cancell|cansel|kancel|kansel|delete|remove|elimin|togli|tolli)/.test(v.replace(/ /g,"")); }
+function isSave(v){ return cmdWords(v) && /^(salv|save|saved|silva|selva|sylva|salba|ricord|remember|segna|keep)/.test(v.replace(/ /g,"")); }
 function voiceDelete(){ clearTimeout(settleT); clearTimeout(autoT); $("delBtn").onclick(); }
+function voiceSave(){ // salva soltanto (non toglie mai): resta sulla parola, poi di\' «ok» per andare avanti
+  clearTimeout(settleT);
+  if(!starred.has(current.key)) $("starBtn").onclick(); else toast("Già salvata");
+  if(phase==="ask"){ $("answer").value=""; }
+  freshListen();
+}
 function isOk(v){ return OK_WORDS.some(w=>v===w || v.split(" ").includes(w) && v.split(" ").length<=2); }
 function onHeard(text, final){
   if(!inDrill()||!current) return;
@@ -496,12 +514,14 @@ function onHeard(text, final){
     $("answer").value=text.trim();
     const r=judge(v,true);
     if(r!=="ok" && isDel(v)) return voiceDelete();
+    if(r!=="ok" && isSave(v)) return voiceSave();
     // a right answer counts immediately; otherwise wait for the phrase to settle
     if(r==="ok"){ return resolveSpoken(); }
     clearTimeout(settleT);
     settleT=setTimeout(resolveSpoken, final?150:900);
   } else if(phase==="wrong" || phase==="done"){
     if(isDel(v)) return voiceDelete();
+    if(isSave(v)) return voiceSave();
     if(isOk(v)){ clearTimeout(autoT); next(); }
   }
 }
@@ -511,6 +531,7 @@ function resolveSpoken(){
   const v=norm($("answer").value);
   if(isOk(v) && judge(v,true)!=="ok"){ next(); return; }
   if(isDel(v) && judge(v,true)!=="ok"){ voiceDelete(); return; }
+  if(isSave(v) && judge(v,true)!=="ok"){ voiceSave(); return; }
   const r=check(true);
   if(r==="ok"||r==="near"){ phase="done"; autoT=setTimeout(()=>{ if(phase==="done") next(); },1500); }
   else { phase="wrong"; }
@@ -558,6 +579,49 @@ $("micBtn").onclick=async()=>{
   voiceOn=!voiceOn;
   if(voiceOn){ setMic("live", micLabel()); keepAwake(true); await grabStream(); if(!voiceOn) return; if(inDrill()) renderWord(); else startRec(); }
   else { clearTimeout(autoT); clearTimeout(settleT); try{ rec&&rec.abort(); }catch(_){} rec=null; dropStream(); setMic("","Rispondi a voce"); keepAwake(false); if(inDrill()) renderWord(); }
+};
+
+/* ---------- dati: esporta / importa ----------
+   File JSON con parole salvate e cancellate, direzione e categoria.
+   Importa UNISCE i dati (non toglie nulla di quello che c'è già) e si può annullare. */
+function exportData(){
+  const data={app:"lessico",version:1,exportedAt:new Date().toISOString(),
+    deleted:[...deleted],star:[...starred],dir:state.dir,cat:state.cat};
+  const name="lessico-dati-"+new Date().toISOString().slice(0,10)+".json";
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const file=(typeof File==="function")?new File([blob],name,{type:"application/json"}):null;
+  const fallback=()=>{
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast("File esportato");
+  };
+  if(file && navigator.canShare && navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:"Dati Lessico"}).catch(e=>{ if(e&&e.name!=="AbortError") fallback(); });
+  } else fallback();
+}
+function importData(text){
+  let d; try{ d=JSON.parse(text); }catch(e){ return toast("File non valido"); }
+  if(!d || d.app!=="lessico" || !Array.isArray(d.deleted) || !Array.isArray(d.star)) return toast("Non è un file di Lessico");
+  const known=new Set(items.map(w=>w.key));
+  const prevDel=new Set(deleted), prevStar=new Set(starred), prevState={dir:state.dir,cat:state.cat};
+  let nd=0, ns=0;
+  for(const k of d.deleted) if(known.has(k) && !deleted.has(k)){ deleted.add(k); nd++; }
+  for(const k of d.star) if(known.has(k) && !starred.has(k)){ starred.add(k); ns++; }
+  if(d.dir==="it-en"||d.dir==="en-it") state.dir=d.dir;
+  if(typeof d.cat==="string" && isValidCat(d.cat)) state.cat=d.cat;
+  save(); renderChrome(); openMenu(false);
+  if(inDrill()){ buildDeck(); renderWord(); }
+  toast("Importate: "+ns+" salvate, "+nd+" cancellate", ()=>{
+    deleted=prevDel; starred=prevStar; state.dir=prevState.dir; state.cat=prevState.cat;
+    save(); renderChrome(); if(inDrill()){ buildDeck(); renderWord(); }
+  });
+}
+$("expBtn").onclick=exportData;
+$("impBtn").onclick=()=>$("impFile").click();
+$("impFile").onchange=e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value="";
+  if(!f) return;
+  const r=new FileReader(); r.onload=()=>importData(String(r.result)); r.onerror=()=>toast("Impossibile leggere il file"); r.readAsText(f);
 };
 
 renderChrome();
